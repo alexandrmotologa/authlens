@@ -43,6 +43,10 @@ It serves standard OpenID Connect (OIDC) discovery and JWKS endpoints, tracks OA
 | :---: | :---: |
 | ![Security Fuzzer Lab](docs/images/authlens-5.png) | ![Keystore & JWKS Explorer](docs/images/authlens-6.png) |
 
+| 07. Live HTTP Traffic & Request Audit Log |
+| :---: |
+| ![Live HTTP Traffic Logs](docs/images/authlens-7.png) |
+
 ## Core Capabilities
 
 ### 1. Zero-Config Local OIDC Mock Provider
