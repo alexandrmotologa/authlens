@@ -1,0 +1,30 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+authlens
+
+# Test artifacts
+*.test
+*.out
+coverage.txt
+
+# Node dependencies and build outputs
+web/node_modules/
+web/dist/
+web/.vite/
+node_modules/
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary frame directories
+docs/images/frames/
