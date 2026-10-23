@@ -180,4 +180,36 @@ func TestEndToEndPKCEFlow(t *testing.T) {
 	if introResp["active"] != true {
 		t.Errorf("expected active: true in token introspection")
 	}
+
+	// 8. Test Browser Consent Screen rendering
+	reqBrowser, _ := http.NewRequest("GET", "/oauth/authorize?client_id=my-frontend&redirect_uri=http://localhost:3000/cb", nil)
+	reqBrowser.Header.Set("Accept", "text/html,application/xhtml+xml")
+	wBrowser := httptest.NewRecorder()
+	srv.Engine.ServeHTTP(wBrowser, reqBrowser)
+
+	if wBrowser.Code != http.StatusOK {
+		t.Errorf("expected 200 OK HTML consent page for browser request, got %d", wBrowser.Code)
+	}
+	if !strings.Contains(wBrowser.Body.String(), "AuthLens Authorization") {
+		t.Error("expected consent screen title in HTML response")
+	}
+
+	// 9. Test Deny Action on consent screen
+	formDeny := url.Values{}
+	formDeny.Set("client_id", "my-frontend")
+	formDeny.Set("redirect_uri", "http://localhost:3000/cb")
+	formDeny.Set("action", "deny")
+	formDeny.Set("state", "xyz")
+
+	reqDeny, _ := http.NewRequest("POST", "/oauth/authorize", strings.NewReader(formDeny.Encode()))
+	reqDeny.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	wDeny := httptest.NewRecorder()
+	srv.Engine.ServeHTTP(wDeny, reqDeny)
+
+	if wDeny.Code != http.StatusFound {
+		t.Errorf("expected redirect on deny, got %d", wDeny.Code)
+	}
+	if !strings.Contains(wDeny.Header().Get("Location"), "error=access_denied") {
+		t.Errorf("expected access_denied in redirect location: %s", wDeny.Header().Get("Location"))
+	}
 }

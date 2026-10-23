@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ServerStatus } from '../types';
-import { Key, RefreshCw, Copy, Check, Download, ShieldCheck, Lock } from 'lucide-react';
+import { Key, RefreshCw, Copy, Check, Lock, Zap } from 'lucide-react';
 
 interface KeysPanelProps {
   status: ServerStatus | null;
@@ -9,7 +9,7 @@ interface KeysPanelProps {
 
 export const KeysPanel: React.FC<KeysPanelProps> = ({ status, onRefresh }) => {
   const [jwksData, setJwksData] = useState<any>(null);
-  const [keysExport, setKeysExport] = useState<{ rsa_public_pem: string; ec_public_pem: string } | null>(null);
+  const [keysExport, setKeysExport] = useState<{ rsa_public_pem: string; ec_public_pem: string; ed_public_pem?: string } | null>(null);
   const [rotating, setRotating] = useState<boolean>(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -58,7 +58,7 @@ export const KeysPanel: React.FC<KeysPanelProps> = ({ status, onRefresh }) => {
         <div>
           <h2 className="text-lg font-bold text-white tracking-tight">Cryptographic Keystore &amp; JWKS Explorer</h2>
           <p className="text-xs text-slate-400">
-            Ephemeral and rotated asymmetric signing keys published at RFC 7517 <code className="text-cyan-400 font-mono">/.well-known/jwks.json</code>
+            Ephemeral and rotated asymmetric signing keys published at RFC 7517 / RFC 8037 <code className="text-cyan-400 font-mono">/.well-known/jwks.json</code>
           </p>
         </div>
 
@@ -72,14 +72,14 @@ export const KeysPanel: React.FC<KeysPanelProps> = ({ status, onRefresh }) => {
         </button>
       </div>
 
-      {/* Active Keys Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Active Keys Cards Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* RSA Key */}
         <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-cyan-400" />
-              <h3 className="text-sm font-bold text-white">Active RSA 2048 Keypair</h3>
+              <h3 className="text-sm font-bold text-white">RSA 2048 Key</h3>
             </div>
             <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-cyan-950 text-cyan-400 border border-cyan-800">
               RS256
@@ -89,15 +89,15 @@ export const KeysPanel: React.FC<KeysPanelProps> = ({ status, onRefresh }) => {
           <div className="space-y-1.5 text-xs font-mono">
             <div className="flex justify-between py-1 border-b border-slate-800/60">
               <span className="text-slate-400">Key ID (kid):</span>
-              <span className="text-white font-semibold">{status?.active_rsa_kid}</span>
+              <span className="text-white font-semibold truncate max-w-[130px]">{status?.active_rsa_kid}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-800/60">
               <span className="text-slate-400">Key Type:</span>
               <span className="text-slate-300">RSA (2048-bit)</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-800/60">
-              <span className="text-slate-400">Public Exponent (e):</span>
-              <span className="text-slate-300">AQAB (65537)</span>
+              <span className="text-slate-400">Public Exponent:</span>
+              <span className="text-slate-300">65537 (AQAB)</span>
             </div>
           </div>
 
@@ -108,7 +108,7 @@ export const KeysPanel: React.FC<KeysPanelProps> = ({ status, onRefresh }) => {
                 className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-900 border border-slate-800 text-xs font-mono text-cyan-400 transition"
               >
                 {copiedKey === 'rsa_pem' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>Copy RSA Public Key PEM</span>
+                <span>Copy RSA PEM</span>
               </button>
             </div>
           )}
@@ -119,7 +119,7 @@ export const KeysPanel: React.FC<KeysPanelProps> = ({ status, onRefresh }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-indigo-400" />
-              <h3 className="text-sm font-bold text-white">Active ECDSA P-256 Keypair</h3>
+              <h3 className="text-sm font-bold text-white">ECDSA P-256 Key</h3>
             </div>
             <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-indigo-950 text-indigo-400 border border-indigo-800">
               ES256
@@ -129,11 +129,11 @@ export const KeysPanel: React.FC<KeysPanelProps> = ({ status, onRefresh }) => {
           <div className="space-y-1.5 text-xs font-mono">
             <div className="flex justify-between py-1 border-b border-slate-800/60">
               <span className="text-slate-400">Key ID (kid):</span>
-              <span className="text-white font-semibold">{status?.active_ec_kid}</span>
+              <span className="text-white font-semibold truncate max-w-[130px]">{status?.active_ec_kid}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-800/60">
               <span className="text-slate-400">Key Type:</span>
-              <span className="text-slate-300">EC (secp256r1 / P-256)</span>
+              <span className="text-slate-300">EC (secp256r1)</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-800/60">
               <span className="text-slate-400">Curve:</span>
@@ -148,7 +148,47 @@ export const KeysPanel: React.FC<KeysPanelProps> = ({ status, onRefresh }) => {
                 className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-900 border border-slate-800 text-xs font-mono text-indigo-400 transition"
               >
                 {copiedKey === 'ec_pem' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>Copy ECDSA Public Key PEM</span>
+                <span>Copy ECDSA PEM</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Ed25519 Key */}
+        <div className="rounded-xl border border-slate-800 bg-[#0B0F19] p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-sm font-bold text-white">Ed25519 (OKP) Key</h3>
+            </div>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+              EdDSA
+            </span>
+          </div>
+
+          <div className="space-y-1.5 text-xs font-mono">
+            <div className="flex justify-between py-1 border-b border-slate-800/60">
+              <span className="text-slate-400">Key ID (kid):</span>
+              <span className="text-white font-semibold truncate max-w-[130px]">{status?.active_ed_kid || 'authlens-ed-key-1'}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-slate-800/60">
+              <span className="text-slate-400">Key Type:</span>
+              <span className="text-slate-300">OKP (RFC 8037)</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-slate-800/60">
+              <span className="text-slate-400">Curve:</span>
+              <span className="text-slate-300">Ed25519</span>
+            </div>
+          </div>
+
+          {keysExport?.ed_public_pem && (
+            <div className="pt-2">
+              <button
+                onClick={() => copyToClipboard(keysExport.ed_public_pem!, 'ed_pem')}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-900 border border-slate-800 text-xs font-mono text-emerald-400 transition"
+              >
+                {copiedKey === 'ed_pem' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>Copy EdDSA PEM</span>
               </button>
             </div>
           )}
@@ -160,7 +200,7 @@ export const KeysPanel: React.FC<KeysPanelProps> = ({ status, onRefresh }) => {
         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Key className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-sm font-semibold text-white">Live JWKS Payload (RFC 7517)</h3>
+            <h3 className="text-sm font-semibold text-white">Live JWKS Payload (RFC 7517 &amp; RFC 8037)</h3>
           </div>
           {jwksData && (
             <button

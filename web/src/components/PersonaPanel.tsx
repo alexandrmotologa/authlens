@@ -122,6 +122,7 @@ export const PersonaPanel: React.FC<PersonaPanelProps> = ({ baseURL, onInspectTo
           >
             <option value="RS256">Algorithm: RS256 (RSA 2048)</option>
             <option value="ES256">Algorithm: ES256 (ECDSA P-256)</option>
+            <option value="EdDSA">Algorithm: EdDSA (Ed25519 OKP)</option>
             <option value="HS256">Algorithm: HS256 (HMAC Shared Secret)</option>
           </select>
 

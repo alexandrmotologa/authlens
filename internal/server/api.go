@@ -25,6 +25,7 @@ type Server struct {
 	Personas   *persona.Registry
 	Codes      *oidc.AuthCodeStore
 	Traces     *pkce.TraceStore
+	AuditStore *AuditLogStore
 	Fuzzer     *fuzzer.AttackGenerator
 	BaseURL    string
 	Port       int
@@ -59,23 +60,26 @@ func NewServer(cfg Config) (*Server, error) {
 	personas := persona.NewRegistry()
 	codes := oidc.NewAuthCodeStore()
 	traces := pkce.NewTraceStore(200)
+	auditStore := NewAuditLogStore(200)
 	fuzzGen := fuzzer.NewAttackGenerator(km, cfg.BaseURL)
 
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	engine.Use(corsMiddleware())
+	engine.Use(AuditMiddleware(auditStore))
 
 	s := &Server{
-		Engine:    engine,
-		KM:        km,
-		Personas:  personas,
-		Codes:     codes,
-		Traces:    traces,
-		Fuzzer:    fuzzGen,
-		BaseURL:   cfg.BaseURL,
-		Port:      cfg.Port,
-		StartTime: time.Now().UTC(),
+		Engine:     engine,
+		KM:         km,
+		Personas:   personas,
+		Codes:      codes,
+		Traces:     traces,
+		AuditStore: auditStore,
+		Fuzzer:     fuzzGen,
+		BaseURL:    cfg.BaseURL,
+		Port:       cfg.Port,
+		StartTime:  time.Now().UTC(),
 	}
 
 	s.setupRoutes()
@@ -152,6 +156,18 @@ func (s *Server) setupRoutes() {
 		api.POST("/keys/rotate", s.handleRotateKeys)
 		api.GET("/keys/export", s.handleExportKeys)
 
+		// Mock Protected Resource Server Sandbox
+		api.GET("/mock/protected", s.handleMockProtected)
+		api.POST("/mock/protected", s.handleMockProtected)
+
+		// Live Request Audit Log
+		api.GET("/audit/logs", s.handleListAuditLogs)
+		api.DELETE("/audit/logs", s.handleClearAuditLogs)
+
+		// Postman & Bruno Exporters
+		api.GET("/export/postman", s.handleExportPostman)
+		api.GET("/export/bruno", s.handleExportBruno)
+
 		api.GET("/events", s.handleEventsSSE)
 	}
 
@@ -161,15 +177,17 @@ func (s *Server) setupRoutes() {
 
 func (s *Server) handleStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"name":           "AuthLens",
-		"version":        "1.0.0",
-		"base_url":       s.BaseURL,
-		"port":           s.Port,
-		"uptime_seconds": int64(time.Since(s.StartTime).Seconds()),
-		"active_rsa_kid": s.KM.ActiveRSA.ID,
-		"active_ec_kid":  s.KM.ActiveECDSA.ID,
-		"personas_count": len(s.Personas.List()),
-		"traces_count":   len(s.Traces.GetAllTraces()),
+		"name":             "AuthLens",
+		"version":          "1.0.0",
+		"base_url":         s.BaseURL,
+		"port":             s.Port,
+		"uptime_seconds":   int64(time.Since(s.StartTime).Seconds()),
+		"active_rsa_kid":   s.KM.ActiveRSA.ID,
+		"active_ec_kid":    s.KM.ActiveECDSA.ID,
+		"active_ed_kid":    s.KM.ActiveEd25519.ID,
+		"personas_count":   len(s.Personas.List()),
+		"traces_count":     len(s.Traces.GetAllTraces()),
+		"audit_logs_count": len(s.AuditStore.GetAll()),
 	})
 }
 
@@ -418,6 +436,7 @@ func (s *Server) handleRotateKeys(c *gin.Context) {
 		"status":         "rotated",
 		"active_rsa_kid": s.KM.ActiveRSA.ID,
 		"active_ec_kid":  s.KM.ActiveECDSA.ID,
+		"active_ed_kid":  s.KM.ActiveEd25519.ID,
 		"rotated_count":  len(s.KM.RotatedKeys),
 	})
 }
@@ -425,23 +444,123 @@ func (s *Server) handleRotateKeys(c *gin.Context) {
 func (s *Server) handleExportKeys(c *gin.Context) {
 	rsaPEM, _ := s.KM.ExportRSAPublicPEM()
 	ecPEM, _ := s.KM.ExportECPublicPEM()
+	edPEM, _ := s.KM.ExportEdPublicPEM()
 	jwks, _ := s.KM.GetJWKS()
 
 	c.JSON(http.StatusOK, gin.H{
 		"rsa_public_pem": rsaPEM,
 		"ec_public_pem":  ecPEM,
+		"ed_public_pem":  edPEM,
 		"jwks":           jwks,
 	})
 }
 
+// Built-in Mock Protected Resource Server Sandbox
+func (s *Server) handleMockProtected(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.Header("WWW-Authenticate", "Bearer error=\"unauthorized\", error_description=\"Authorization header with Bearer token is required\"")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":             "unauthorized",
+			"error_description": "Authorization header with Bearer token is required",
+		})
+		return
+	}
+
+	tokenStr := strings.TrimSpace(authHeader)
+	if strings.HasPrefix(strings.ToLower(tokenStr), "bearer ") {
+		tokenStr = strings.TrimSpace(tokenStr[7:])
+	}
+
+	valRes, err := jwt.ValidateOffline(tokenStr, s.KM, "")
+	if err != nil || !valRes.Valid {
+		c.Header("WWW-Authenticate", fmt.Sprintf("Bearer error=\"invalid_token\", error_description=%q", valRes.Error))
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":             "invalid_token",
+			"error_description": valRes.Error,
+			"verdict":           "REJECTED_BY_MIDDLEWARE",
+		})
+		return
+	}
+
+	decoded, _ := jwt.DecodeOffline(tokenStr)
+	requiredRole := c.DefaultQuery("required_role", "admin")
+
+	// Check if persona is suspended
+	if status, ok := decoded.Payload["status"].(string); ok && status == "suspended" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":             "forbidden",
+			"error_description": "Account suspended: access to protected resource denied",
+		})
+		return
+	}
+
+	// Verify roles if requiredRole is not empty
+	if requiredRole != "" {
+		hasRole := false
+		if roles, ok := decoded.Payload["roles"].([]any); ok {
+			for _, r := range roles {
+				if str, ok := r.(string); ok && (str == requiredRole || str == "*") {
+					hasRole = true
+					break
+				}
+			}
+		}
+		if !hasRole {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":             "insufficient_scope",
+				"error_description": fmt.Sprintf("Access requires role %q", requiredRole),
+			})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":       "access_granted",
+		"message":      "Welcome to AuthLens Protected Resource Sandbox!",
+		"subject":      decoded.Subject,
+		"claims":       decoded.Payload,
+		"algorithm":    decoded.Algorithm,
+		"key_id":       decoded.KeyID,
+		"validated_by": "AuthLens Cryptographic Middleware Sandbox",
+	})
+}
+
+// Audit Log Handlers
+func (s *Server) handleListAuditLogs(c *gin.Context) {
+	c.JSON(http.StatusOK, s.AuditStore.GetAll())
+}
+
+func (s *Server) handleClearAuditLogs(c *gin.Context) {
+	s.AuditStore.Clear()
+	c.JSON(http.StatusOK, gin.H{"status": "cleared"})
+}
+
+// Postman and Bruno Collection Exporters
+func (s *Server) handleExportPostman(c *gin.Context) {
+	col := BuildPostmanCollection(s.BaseURL)
+	c.Header("Content-Disposition", "attachment; filename=\"authlens_postman_collection.json\"")
+	c.JSON(http.StatusOK, col)
+}
+
+func (s *Server) handleExportBruno(c *gin.Context) {
+	col := BuildBrunoCollection(s.BaseURL)
+	c.Header("Content-Disposition", "attachment; filename=\"authlens_bruno_collection.json\"")
+	c.JSON(http.StatusOK, col)
+}
+
+// handleEventsSSE streams both PKCE trace events and HTTP request audit logs.
 func (s *Server) handleEventsSSE(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
 
-	ch := s.Traces.Subscribe()
-	defer s.Traces.Unsubscribe(ch)
+	traceCh := s.Traces.Subscribe()
+	defer s.Traces.Unsubscribe(traceCh)
+
+	auditCh := s.AuditStore.Subscribe()
+	defer s.AuditStore.Unsubscribe(auditCh)
 
 	// Send initial connection event
 	c.SSEvent("connected", gin.H{"time": time.Now().UTC()})
@@ -452,12 +571,19 @@ func (s *Server) handleEventsSSE(c *gin.Context) {
 		select {
 		case <-notify:
 			return
-		case trace, ok := <-ch:
+		case trace, ok := <-traceCh:
 			if !ok {
 				return
 			}
 			b, _ := json.Marshal(trace)
 			c.SSEvent("trace", string(b))
+			c.Writer.Flush()
+		case logEntry, ok := <-auditCh:
+			if !ok {
+				return
+			}
+			b, _ := json.Marshal(logEntry)
+			c.SSEvent("audit_log", string(b))
 			c.Writer.Flush()
 		}
 	}

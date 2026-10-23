@@ -105,9 +105,18 @@ export const FuzzerPanel: React.FC<FuzzerPanelProps> = ({ onInspectToken }) => {
             </div>
 
             <div className="md:col-span-3">
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Target Backend Protected Endpoint URL
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-slate-300">
+                  Target Backend Protected Endpoint URL
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setTargetUrl('http://127.0.0.1:9099/api/mock/protected')}
+                  className="text-[11px] text-cyan-400 hover:text-cyan-300 underline font-mono cursor-pointer"
+                >
+                  Quick Target: Internal Mock Sandbox (Port 9099)
+                </button>
+              </div>
               <input
                 type="url"
                 required

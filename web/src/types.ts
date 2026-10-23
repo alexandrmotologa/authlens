@@ -6,8 +6,10 @@ export interface ServerStatus {
   uptime_seconds: number;
   active_rsa_kid: string;
   active_ec_kid: string;
+  active_ed_kid?: string;
   personas_count: number;
   traces_count: number;
+  audit_logs_count?: number;
 }
 
 export interface Persona {
@@ -119,4 +121,16 @@ export interface SuiteReport {
   errors: number;
   score_pct: number;
   results: TestResult[];
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  method: string;
+  path: string;
+  query?: string;
+  status_code: number;
+  latency_ms: number;
+  client_ip: string;
+  user_agent: string;
 }

@@ -2,6 +2,7 @@ package keys
 
 import (
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -24,19 +25,22 @@ type KeyPair struct {
 	RSAPub    *rsa.PublicKey
 	ECPriv    *ecdsa.PrivateKey
 	ECPub     *ecdsa.PublicKey
+	EdPriv    ed25519.PrivateKey
+	EdPub     ed25519.PublicKey
 }
 
 // KeyManager handles generation, rotation, and JWKS publishing of cryptographic keys.
 type KeyManager struct {
-	mu          sync.RWMutex
-	ActiveRSA   *KeyPair
-	ActiveECDSA *KeyPair
-	HMACSecret  []byte
-	RotatedKeys []*KeyPair
-	generation  int
+	mu            sync.RWMutex
+	ActiveRSA     *KeyPair
+	ActiveECDSA   *KeyPair
+	ActiveEd25519 *KeyPair
+	HMACSecret    []byte
+	RotatedKeys   []*KeyPair
+	generation    int
 }
 
-// NewKeyManager initializes standard RSA 2048, ECDSA P-256, and HMAC keys.
+// NewKeyManager initializes standard RSA 2048, ECDSA P-256, Ed25519, and HMAC keys.
 func NewKeyManager() (*KeyManager, error) {
 	km := &KeyManager{
 		HMACSecret:  []byte("authlens-local-hmac-secret-development-key-32bytes"),
@@ -55,6 +59,12 @@ func NewKeyManager() (*KeyManager, error) {
 		return nil, fmt.Errorf("failed to generate ECDSA key: %w", err)
 	}
 	km.ActiveECDSA = ecPair
+
+	edPair, err := km.generateEd25519(km.generation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate Ed25519 key: %w", err)
+	}
+	km.ActiveEd25519 = edPair
 
 	return km, nil
 }
@@ -89,6 +99,21 @@ func (km *KeyManager) generateECDSA(gen int) (*KeyPair, error) {
 	}, nil
 }
 
+func (km *KeyManager) generateEd25519(gen int) (*KeyPair, error) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	return &KeyPair{
+		ID:        fmt.Sprintf("authlens-ed-key-%d", gen),
+		Algorithm: "EdDSA",
+		Use:       "sig",
+		CreatedAt: time.Now().UTC(),
+		EdPriv:    priv,
+		EdPub:     pub,
+	}, nil
+}
+
 // RotateKeys generates a new generation of keys and retains old keys for validation.
 func (km *KeyManager) RotateKeys() error {
 	km.mu.Lock()
@@ -103,15 +128,20 @@ func (km *KeyManager) RotateKeys() error {
 	if err != nil {
 		return err
 	}
+	newEd, err := km.generateEd25519(km.generation)
+	if err != nil {
+		return err
+	}
 
-	km.RotatedKeys = append(km.RotatedKeys, km.ActiveRSA, km.ActiveECDSA)
+	km.RotatedKeys = append(km.RotatedKeys, km.ActiveRSA, km.ActiveECDSA, km.ActiveEd25519)
 	km.ActiveRSA = newRSA
 	km.ActiveECDSA = newEC
+	km.ActiveEd25519 = newEd
 
 	return nil
 }
 
-// GetJWKS constructs the RFC 7517 compliant JSON Web Key Set.
+// GetJWKS constructs the RFC 7517 / RFC 8037 compliant JSON Web Key Set.
 func (km *KeyManager) GetJWKS() (jwk.Set, error) {
 	km.mu.RLock()
 	defer km.mu.RUnlock()
@@ -140,6 +170,17 @@ func (km *KeyManager) GetJWKS() (jwk.Set, error) {
 		}
 	}
 
+	// Active Ed25519
+	if km.ActiveEd25519 != nil && km.ActiveEd25519.EdPub != nil {
+		key, err := jwk.FromRaw(km.ActiveEd25519.EdPub)
+		if err == nil {
+			_ = key.Set(jwk.KeyIDKey, km.ActiveEd25519.ID)
+			_ = key.Set(jwk.AlgorithmKey, "EdDSA")
+			_ = key.Set(jwk.KeyUsageKey, "sig")
+			_ = set.AddKey(key)
+		}
+	}
+
 	// Rotated keys
 	for _, old := range km.RotatedKeys {
 		if old.RSAPub != nil {
@@ -152,6 +193,14 @@ func (km *KeyManager) GetJWKS() (jwk.Set, error) {
 			}
 		} else if old.ECPub != nil {
 			key, err := jwk.FromRaw(old.ECPub)
+			if err == nil {
+				_ = key.Set(jwk.KeyIDKey, old.ID)
+				_ = key.Set(jwk.AlgorithmKey, old.Algorithm)
+				_ = key.Set(jwk.KeyUsageKey, old.Use)
+				_ = set.AddKey(key)
+			}
+		} else if old.EdPub != nil {
+			key, err := jwk.FromRaw(old.EdPub)
 			if err == nil {
 				_ = key.Set(jwk.KeyIDKey, old.ID)
 				_ = key.Set(jwk.AlgorithmKey, old.Algorithm)
@@ -174,6 +223,9 @@ func (km *KeyManager) FindKeyByID(kid string) *KeyPair {
 	}
 	if km.ActiveECDSA != nil && km.ActiveECDSA.ID == kid {
 		return km.ActiveECDSA
+	}
+	if km.ActiveEd25519 != nil && km.ActiveEd25519.ID == kid {
+		return km.ActiveEd25519
 	}
 	for _, k := range km.RotatedKeys {
 		if k.ID == kid {
@@ -205,6 +257,22 @@ func (km *KeyManager) ExportECPublicPEM() (string, error) {
 	defer km.mu.RUnlock()
 
 	der, err := x509.MarshalPKIXPublicKey(km.ActiveECDSA.ECPub)
+	if err != nil {
+		return "", err
+	}
+	b := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: der,
+	})
+	return string(b), nil
+}
+
+// ExportEdPublicPEM encodes the active Ed25519 public key into PKIX PEM string.
+func (km *KeyManager) ExportEdPublicPEM() (string, error) {
+	km.mu.RLock()
+	defer km.mu.RUnlock()
+
+	der, err := x509.MarshalPKIXPublicKey(km.ActiveEd25519.EdPub)
 	if err != nil {
 		return "", err
 	}

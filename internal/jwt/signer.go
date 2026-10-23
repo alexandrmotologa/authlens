@@ -67,6 +67,13 @@ func SignCustom(claims map[string]any, km *keys.KeyManager, alg string) (string,
 		}
 		key = km.ActiveECDSA.ECPriv
 		kid = km.ActiveECDSA.ID
+	case "EdDSA":
+		method = jwtgo.SigningMethodEdDSA
+		if km.ActiveEd25519 == nil || km.ActiveEd25519.EdPriv == nil {
+			return "", errors.New("active Ed25519 private key not available")
+		}
+		key = km.ActiveEd25519.EdPriv
+		kid = km.ActiveEd25519.ID
 	case "HS256":
 		method = jwtgo.SigningMethodHS256
 		key = km.HMACSecret

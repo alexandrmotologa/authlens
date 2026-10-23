@@ -154,6 +154,14 @@ authlens/
   - **Offline JWT Editor**: Edit JSON claims in real-time and see signature recalculate automatically.
 - Single binary distribution: Embed frontend assets into Go binary with `//go:embed`.
 
+### Phase 6: Extended Capabilities & Enhancements (Completed)
+- **Interactive Browser Consent Screen**: Full OAuth 2.1 user consent screen on `/oauth/authorize` when `consent=true`, complete with persona switching and scope approval.
+- **Ed25519 (EdDSA RFC 8037)**: Native OKP / Ed25519 asymmetric cryptography across keystore, JWKS, token minting, and offline verification.
+- **Mock Protected API Sandbox**: Built-in RFC 6750 resource server endpoint at `/api/mock/protected` supporting live Bearer token validation and scope enforcement.
+- **JWT Claims Diff Studio**: Side-by-side visual claim difference comparison between any two JWT tokens.
+- **Postman & Bruno Workspace Exporters**: Export ready-to-run collections via `/api/export/postman` and `/api/export/bruno` for team API testing.
+- **Live HTTP Traffic & Request Audit Log**: Ring buffer logging and real-time SSE telemetry for tracking incoming requests, latencies, and response codes.
+
 ---
 
 ## 4. Agent Kickoff Prompt

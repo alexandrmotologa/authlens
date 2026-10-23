@@ -75,6 +75,19 @@ func TestECDSAandHMAC(t *testing.T) {
 		t.Errorf("expected ES256 to validate: %v, %s", err, valES.Error)
 	}
 
+	// EdDSA (Ed25519)
+	edToken, err := jwt.SignCustom(claims, km, "EdDSA")
+	if err != nil {
+		t.Fatalf("failed to sign EdDSA: %v", err)
+	}
+	valEd, err := jwt.ValidateOffline(edToken, km, "")
+	if err != nil || !valEd.Valid {
+		t.Errorf("expected EdDSA to validate: %v, %s", err, valEd.Error)
+	}
+	if valEd.KeySource != "local_eddsa" {
+		t.Errorf("expected key source local_eddsa, got %s", valEd.KeySource)
+	}
+
 	// HS256
 	hsToken, err := jwt.SignCustom(claims, km, "HS256")
 	if err != nil {

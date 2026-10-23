@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -95,6 +96,19 @@ func ValidateOffline(tokenStr string, km *keys.KeyManager, customKey string) (*V
 			}
 			return nil, fmt.Errorf("no ECDSA public key found for kid %q", kid)
 
+		case "EdDSA":
+			res.KeySource = "local_eddsa"
+			if kid != "" {
+				kp := km.FindKeyByID(kid)
+				if kp != nil && kp.EdPub != nil {
+					return kp.EdPub, nil
+				}
+			}
+			if km.ActiveEd25519 != nil && km.ActiveEd25519.EdPub != nil {
+				return km.ActiveEd25519.EdPub, nil
+			}
+			return nil, fmt.Errorf("no Ed25519 public key found for kid %q", kid)
+
 		case "HS256", "HS384", "HS512":
 			res.KeySource = "local_hmac"
 			return km.HMACSecret, nil
@@ -170,6 +184,11 @@ func parseCustomKey(keyStr, alg string) (any, error) {
 				return ecPub, nil
 			}
 			return nil, errors.New("custom key is not an ECDSA public key")
+		case "EdDSA":
+			if edPub, ok := pub.(ed25519.PublicKey); ok {
+				return edPub, nil
+			}
+			return nil, errors.New("custom key is not an Ed25519 public key")
 		}
 	}
 

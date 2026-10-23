@@ -19,6 +19,9 @@ func TestKeyManagerGeneration(t *testing.T) {
 	if km.ActiveECDSA == nil || km.ActiveECDSA.ECPriv == nil {
 		t.Fatal("expected active ECDSA key to be generated")
 	}
+	if km.ActiveEd25519 == nil || km.ActiveEd25519.EdPriv == nil {
+		t.Fatal("expected active Ed25519 key to be generated")
+	}
 
 	if !strings.HasPrefix(km.ActiveRSA.ID, "authlens-rsa-key-") {
 		t.Errorf("unexpected RSA key id: %s", km.ActiveRSA.ID)
@@ -26,13 +29,16 @@ func TestKeyManagerGeneration(t *testing.T) {
 	if !strings.HasPrefix(km.ActiveECDSA.ID, "authlens-ec-key-") {
 		t.Errorf("unexpected ECDSA key id: %s", km.ActiveECDSA.ID)
 	}
+	if !strings.HasPrefix(km.ActiveEd25519.ID, "authlens-ed-key-") {
+		t.Errorf("unexpected Ed25519 key id: %s", km.ActiveEd25519.ID)
+	}
 
 	jwks, err := km.GetJWKS()
 	if err != nil {
 		t.Fatalf("failed to build JWKS: %v", err)
 	}
-	if jwks.Len() < 2 {
-		t.Errorf("expected at least 2 keys in JWKS, got %d", jwks.Len())
+	if jwks.Len() < 3 {
+		t.Errorf("expected at least 3 keys in JWKS, got %d", jwks.Len())
 	}
 }
 

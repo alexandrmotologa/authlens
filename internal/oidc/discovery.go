@@ -31,7 +31,7 @@ func GetDiscoveryMetadata(baseURL string) DiscoveryMetadata {
 		RevocationEndpoint:                baseURL + "/oauth/revoke",
 		ResponseTypesSupported:            []string{"code", "token", "id_token"},
 		SubjectTypesSupported:             []string{"public"},
-		IDTokenSigningAlgValuesSupported:  []string{"RS256", "ES256", "HS256"},
+		IDTokenSigningAlgValuesSupported:  []string{"RS256", "ES256", "EdDSA", "HS256"},
 		ScopesSupported:                   []string{"openid", "profile", "email", "admin", "offline_access"},
 		TokenEndpointAuthMethodsSupported: []string{"client_secret_post", "client_secret_basic", "none"},
 		ClaimsSupported: []string{

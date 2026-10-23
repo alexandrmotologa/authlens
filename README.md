@@ -46,11 +46,13 @@ It serves standard OpenID Connect (OIDC) discovery and JWKS endpoints, tracks OA
 ## Core Capabilities
 
 ### 1. Zero-Config Local OIDC Mock Provider
-- Runs locally on port 9099 with RFC 8414 Discovery (`/.well-known/openid-configuration`) and RFC 7517 JWKS (`/.well-known/jwks.json`).
-- Automatically generates RSA 2048 (`RS256`) and ECDSA P-256 (`ES256`) keypairs on startup.
-- Supports authorization code flows with instant consent bypass or an interactive user authorization screen.
+- Runs locally on port 9099 with RFC 8414 Discovery (`/.well-known/openid-configuration`) and RFC 7517 / RFC 8037 JWKS (`/.well-known/jwks.json`).
+- Automatically generates RSA 2048 (`RS256`), ECDSA P-256 (`ES256`), and Ed25519 (`EdDSA`) keypairs on startup.
+- Supports authorization code flows with instant consent bypass or an interactive browser consent authorization screen with persona chooser.
 - Issues cryptographically signed ID tokens, Access tokens, and Refresh tokens matching OIDC Core 1.0 standards.
 - Exposes standard `/oauth/authorize`, `/oauth/token`, `/userinfo`, `/oauth/introspect`, and `/oauth/revoke` endpoints.
+- Built-in Mock Protected API Sandbox (`/api/mock/protected`) for testing client Bearer token handling against an RFC 6750 resource server without writing backend code.
+- 1-click export of Postman Collection v2.1 and Bruno Collection v1 workspace configurations.
 
 ### 2. Live PKCE Flow Tracer & Handshake Inspector
 - Implements RFC 7636 Proof Key for Code Exchange (PKCE) with SHA-256 (`S256`) and plain code challenges.
@@ -58,12 +60,13 @@ It serves standard OpenID Connect (OIDC) discovery and JWKS endpoints, tracks OA
 - Displays a mathematical breakdown of code challenge derivation: `code_verifier -> SHA-256 -> Base64URL -> stored code_challenge comparison`.
 - Streams handshake events directly to the embedded web interface via Server-Sent Events (SSE).
 
-### 3. 100% Offline JWT Cryptographic Studio
+### 3. 100% Offline JWT Cryptographic Studio & Claims Diff
 - Parses headers, claims, and signatures locally without transmitting bytes across any external network.
 - Color-coded three-part breakdown: Red Header (algorithm, key ID), Purple Payload (claims, roles, timestamps), Cyan Signature (cryptographic bytes).
 - Verifies asymmetric (RS256, RS384, RS512, ES256, ES384, ES512, EdDSA) and symmetric (HS256, HS384, HS512) signatures against local JWKS or custom public keys.
 - Real-time temporal auditing: flags expired tokens, premature tokens (`nbf`), future `iat`, and calculates exact remaining time-to-live.
 - Interactive token editor: modify claims in real time and re-sign with local keys using 1 click.
+- JWT Claims Diff Studio: compare two JWT tokens side by side to instantly visualize changed, added, or removed claims.
 
 ### 4. Middleware Security Lab & Tampering Fuzzer
 - Generates 9 distinct compromised token test vectors for auditing backend authentication middleware:
@@ -76,9 +79,14 @@ It serves standard OpenID Connect (OIDC) discovery and JWKS endpoints, tracks OA
   - **Mismatched Audience (`aud`)**: Alters the audience claim to verify resource server filtering.
   - **Unknown Key ID (`kid`)**: References non-existent keys to test error handling during JWKS key retrieval.
   - **Stripped Signature**: Removes cryptographic bytes entirely (`header.payload.`).
-- Active Middleware Tester: Fires attack vectors against any local backend endpoint (`http://localhost:8080/api/...`) and checks whether all requests return HTTP 401 Unauthorized or 403 Forbidden.
+- Active Middleware Tester: Fires attack vectors against any local backend endpoint (`http://localhost:8080/api/...`) or the internal mock sandbox and checks whether all requests return HTTP 401 Unauthorized or 403 Forbidden.
 
-### 5. Instant Persona Switcher
+### 5. Live HTTP Traffic & Request Audit Log
+- Captures all incoming requests, status codes, response durations, client IPs, and user agents in a ring buffer.
+- Real-time SSE stream with status filters (2xx, 3xx, 4xx, 5xx) and method filters.
+- Detailed JSON telemetry inspectable per request.
+
+### 6. Instant Persona Switcher
 - Switch between simulated users with 1 click to test role-based access control (RBAC):
   - **Admin**: `admin@local.test`, role: `admin`, permissions: `["*"]`, scopes: `openid profile email admin`.
   - **Developer**: `dev@local.test`, role: `developer`, permissions: `["read", "write"]`, scopes: `openid profile email`.
@@ -243,11 +251,11 @@ authlens/
 │       └── main.go               # CLI entrypoint, commands and flags
 ├── internal/
 │   ├── keys/
-│   │   └── keys.go               # Ephemeral & persistent RSA/ECDSA key manager
+│   │   └── keys.go               # Ephemeral & persistent RSA, ECDSA, and Ed25519 key manager
 │   ├── oidc/
 │   │   ├── discovery.go          # RFC 8414 /.well-known/openid-configuration
-│   │   ├── jwks.go               # RFC 7517 /.well-known/jwks.json
-│   │   ├── authorize.go          # /oauth/authorize endpoint with consent flow
+│   │   ├── auth_codes.go         # Thread-safe authorization code store
+│   │   ├── authorize.go          # /oauth/authorize with interactive consent UI
 │   │   ├── token.go              # /oauth/token endpoint with code exchange
 │   │   ├── userinfo.go           # /userinfo endpoint
 │   │   ├── introspect.go         # RFC 7662 token introspection
@@ -258,16 +266,16 @@ authlens/
 │   ├── jwt/
 │   │   ├── decoder.go            # 100% offline header/payload/signature parser
 │   │   ├── validator.go          # Cryptographic signature & temporal audit
-│   │   ├── key_generator.go      # RSA 2048, ECDSA P-256, Ed25519 generator
-│   │   └── signer.go             # Custom token signer
+│   │   └── signer.go             # RS256, ES256, EdDSA, and HS256 token signer
 │   ├── fuzzer/
-│   │   ├── tamper.go             # Attack vector mutation engine
-│   │   ├── attacks.go            # alg:none, key confusion, signature tampering
+│   │   ├── attacks.go            # 9 tampering vectors (alg:none, key confusion, expired)
 │   │   └── test_runner.go        # HTTP client testing backend responses
 │   ├── persona/
-│   │   └── personas.go           # Simulated users (Admin, Developer, Suspended)
+│   │   └── personas.go           # Simulated users (Admin, Developer, Suspended, Custom)
 │   └── server/
-│       ├── api.go                # REST API and SSE broadcaster for web studio
+│       ├── api.go                # REST API, SSE broadcaster, and static embed
+│       ├── logger.go             # HTTP audit logger, ring buffer, and telemetry
+│       ├── export.go             # Postman Collection v2.1 & Bruno Collection v1 exporters
 │       └── static.go             # Embedded React 19 frontend assets
 └── web/                          # React 19 + Tailwind CSS + Lucide studio
 ```

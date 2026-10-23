@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ServerStatus } from '../types';
-import { Copy, Check, ExternalLink, Terminal, Shield, ArrowRight, Code } from 'lucide-react';
+import { Copy, Check, ExternalLink, Terminal, Shield, ArrowRight, Code, Download, Box } from 'lucide-react';
 
 interface OverviewPanelProps {
   status: ServerStatus | null;
@@ -30,15 +30,15 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({ status }) => {
       name: 'JWKS Keystore',
       path: '/.well-known/jwks.json',
       method: 'GET',
-      rfc: 'RFC 7517',
-      desc: 'Active and rotated RSA and ECDSA cryptographic public keys',
+      rfc: 'RFC 7517 / RFC 8037',
+      desc: 'Active and rotated RSA, ECDSA, and Ed25519 cryptographic public keys',
     },
     {
       name: 'Authorization Endpoint',
       path: '/oauth/authorize',
       method: 'GET / POST',
       rfc: 'OAuth 2.1',
-      desc: 'PKCE challenge registration and consent approval flow',
+      desc: 'PKCE challenge registration with interactive browser consent screen',
     },
     {
       name: 'Token Endpoint',
@@ -67,6 +67,13 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({ status }) => {
       method: 'POST',
       rfc: 'RFC 7009',
       desc: 'Token revocation endpoint',
+    },
+    {
+      name: 'Mock Protected Sandbox',
+      path: '/api/mock/protected',
+      method: 'GET / POST',
+      rfc: 'Resource Server',
+      desc: 'Built-in protected API validating JWT signatures and role permissions',
     },
   ];
 
@@ -161,13 +168,22 @@ oauth.register(
               {copiedKey === 'disc_url' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               <span>Copy Discovery URL</span>
             </button>
-            <button
-              onClick={() => copyToClipboard(`curl -s ${baseURL}/.well-known/jwks.json`, 'jwks_curl')}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-xs transition"
+            <a
+              href="/api/export/postman"
+              download="authlens_postman_collection.json"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition"
             >
-              {copiedKey === 'jwks_curl' ? <Check className="w-3.5 h-3.5" /> : <Terminal className="w-3.5 h-3.5" />}
-              <span>Copy JWKS cURL</span>
-            </button>
+              <Download className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Export Postman</span>
+            </a>
+            <a
+              href="/api/export/bruno"
+              download="authlens_bruno_collection.json"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition"
+            >
+              <Download className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Export Bruno</span>
+            </a>
           </div>
         </div>
       </div>

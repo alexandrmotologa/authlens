@@ -7,10 +7,11 @@ import { PkcePanel } from './components/PkcePanel';
 import { JwtPanel } from './components/JwtPanel';
 import { FuzzerPanel } from './components/FuzzerPanel';
 import { KeysPanel } from './components/KeysPanel';
-import { Globe, Users, Activity, FileCode, Bug, Key } from 'lucide-react';
+import { AuditLogPanel } from './components/AuditLogPanel';
+import { Globe, Users, Activity, FileCode, Bug, Key, ScrollText } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'personas' | 'pkce' | 'jwt' | 'fuzzer' | 'keys'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'personas' | 'pkce' | 'jwt' | 'fuzzer' | 'keys' | 'logs'>('overview');
   const [status, setStatus] = useState<ServerStatus | null>(null);
   const [selectedTokenForInspection, setSelectedTokenForInspection] = useState<string>('');
 
@@ -44,6 +45,7 @@ export const App: React.FC = () => {
     { id: 'jwt', label: 'Offline JWT Studio', icon: FileCode },
     { id: 'fuzzer', label: 'Security Fuzzer', icon: Bug },
     { id: 'keys', label: 'Keystore & JWKS', icon: Key },
+    { id: 'logs', label: 'Traffic Logs', icon: ScrollText },
   ] as const;
 
   return (
@@ -95,6 +97,7 @@ export const App: React.FC = () => {
         {activeTab === 'keys' && (
           <KeysPanel status={status} onRefresh={fetchStatus} />
         )}
+        {activeTab === 'logs' && <AuditLogPanel />}
       </main>
 
       {/* Footer */}
