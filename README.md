@@ -29,6 +29,20 @@ It serves standard OpenID Connect (OIDC) discovery and JWKS endpoints, tracks OA
 
 ![AuthLens Demo](docs/images/authlens_demo.gif)
 
+## Screenshots
+
+| 01. OIDC Discovery & Endpoints | 02. Personas & Token Studio |
+| :---: | :---: |
+| ![OIDC Discovery](docs/images/authlens-1.png) | ![Personas & Token Studio](docs/images/authlens-2.png) |
+
+| 03. PKCE Handshake Tracer | 04. Offline JWT Cryptographic Studio |
+| :---: | :---: |
+| ![PKCE Handshake Tracer](docs/images/authlens-3.png) | ![Offline JWT Studio](docs/images/authlens-4.png) |
+
+| 05. Security Fuzzer & Attack Lab | 06. Cryptographic Keystore & JWKS |
+| :---: | :---: |
+| ![Security Fuzzer Lab](docs/images/authlens-5.png) | ![Keystore & JWKS Explorer](docs/images/authlens-6.png) |
+
 ## Core Capabilities
 
 ### 1. Zero-Config Local OIDC Mock Provider

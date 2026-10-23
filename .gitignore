@@ -5,16 +5,15 @@ bin/
 *.dll
 *.so
 *.dylib
-authlens
+/authlens
 
 # Test artifacts
 *.test
 *.out
 coverage.txt
 
-# Node dependencies and build outputs
+# Node dependencies
 web/node_modules/
-web/dist/
 web/.vite/
 node_modules/
 
