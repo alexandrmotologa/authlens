@@ -242,8 +242,9 @@ authlens/
 │   └── authlens/
 │       └── main.go               # CLI entrypoint, commands and flags
 ├── internal/
+│   ├── keys/
+│   │   └── keys.go               # Ephemeral & persistent RSA/ECDSA key manager
 │   ├── oidc/
-│   │   ├── keys.go               # Ephemeral & persistent RSA/ECDSA key manager
 │   │   ├── discovery.go          # RFC 8414 /.well-known/openid-configuration
 │   │   ├── jwks.go               # RFC 7517 /.well-known/jwks.json
 │   │   ├── authorize.go          # /oauth/authorize endpoint with consent flow
